@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Einkaufsliste</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Einkauf">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+:root {
+  --bg: #ebf7eb; --card: #f9fff9; --mid: #5cab73; --dark: #276b45; --chip: #b3deb8;
+  --text: #17261b; --muted: #6b7f70; --sheet: #ffffff; --line: #cfe6d2;
+  --cbl: 83%; --cfl: 22%;
+  --fs: 17px;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101a13; --card: #1a2a1f; --mid: #5cab73; --dark: #8fd3a3; --chip: #2f5a3b;
+    --text: #e8f3ea; --muted: #8fa595; --sheet: #1a2a1f; --line: #2c4332;
+    --cbl: 28%; --cfl: 86%;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101a13; --card: #1a2a1f; --mid: #5cab73; --dark: #8fd3a3; --chip: #2f5a3b;
+  --text: #e8f3ea; --muted: #8fa595; --sheet: #1a2a1f; --line: #2c4332;
+  --cbl: 28%; --cfl: 86%;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh;
+}
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 8px; max-width: 640px; margin: 0 auto;
+}
+h1 { margin: 0; font-size: 30px; color: var(--dark); }
+.icon-btn {
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card); color: var(--dark); font-size: 22px; cursor: pointer;
+}
+.sortbar {
+  max-width: 640px; margin: 0 auto; padding: 4px 16px 8px;
+  display: flex; gap: 6px; align-items: center;
+}
+.sortbar span { font-size: 13px; color: var(--muted); margin-right: 2px; }
+.sortbar button {
+  flex: 1; padding: 9px 6px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); color: var(--dark); font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.sortbar button.active { background: var(--mid); color: #fff; border-color: var(--mid); }
+main { max-width: 640px; margin: 0 auto; padding: 4px 16px 120px; }
+.group {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 14px 4px 6px; font-weight: 700; font-size: calc(var(--fs) * .9);
+  color: hsl(var(--h, 140) 55% var(--cfl));
+}
+.group .gp { font-family: ui-monospace, Menlo, monospace; }
+.row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border-radius: 18px; padding: 12px 14px; margin-bottom: 8px;
+  font-size: var(--fs); cursor: pointer; border-left: 6px solid transparent;
+}
+.row[style*="--h"] { border-left-color: hsl(var(--h) 55% 55%); }
+.check {
+  flex: none; width: calc(var(--fs) + 10px); height: calc(var(--fs) + 10px);
+  border: 2px solid var(--dark); border-radius: 7px; background: transparent;
+  color: #fff; font-size: calc(var(--fs) * .9); line-height: 1; padding: 0; cursor: pointer;
+}
+.done .check { background: var(--mid); border-color: var(--mid); }
+.chip {
+  flex: none; max-width: 32%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: hsl(var(--h, 140) 55% var(--cbl)); color: hsl(var(--h, 140) 55% var(--cfl));
+  border-radius: 999px; padding: 3px 10px; font-size: calc(var(--fs) * .75); font-weight: 600;
+}
+.name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.done .name { text-decoration: line-through; color: var(--muted); }
+.price { flex: none; color: var(--dark); font-family: ui-monospace, Menlo, monospace; }
+.row { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.row.dragging {
+  position: relative; z-index: 5; opacity: .96;
+  box-shadow: 0 10px 24px rgba(0,0,0,.3);
+}
+.row { position: relative; overflow: hidden; }
+/* Ladebalken: füllt sich beim gedrückt Halten, dann hebt sich die Karte ab */
+.row::after {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 4px; width: 0;
+  background: var(--mid); border-radius: 0 4px 4px 0; transition: width 0s;
+}
+.row.pressing::after { width: 100%; transition: width .4s linear; }
+.row.pressing { background: color-mix(in srgb, var(--card) 85%, var(--mid)); }
+.grip {
+  flex: none; width: 11px; height: 20px; opacity: .6; touch-action: none;
+  background-image: radial-gradient(circle, var(--muted) 1.4px, transparent 1.7px);
+  background-size: 6px 7px; margin: 0 -2px 0 2px;
+}
+.row.wiggle { animation: wiggle .8s ease-in-out; }
+@keyframes wiggle {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  15% { transform: translateX(-6px) rotate(-.8deg); }
+  30% { transform: translateX(6px) rotate(.8deg); }
+  45% { transform: translateX(-5px) rotate(-.6deg); }
+  60% { transform: translateX(5px) rotate(.6deg); }
+  75% { transform: translateX(-2px) rotate(0); }
+}
+.hintwrap { max-width: 640px; margin: 0 auto; padding: 0 16px; }
+.hint {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  background: var(--chip); color: var(--dark); border-radius: 14px;
+  padding: 9px 8px 9px 12px; font-size: 14px;
+}
+.hint[hidden] { display: none; }
+.hint span { flex: 1; }
+.hint button {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0;
+  background: transparent; color: var(--dark); font-size: 16px; cursor: pointer;
+}
+.empty { text-align: center; color: var(--muted); padding: 40px 0; }
+.bon {
+  margin-top: 18px; padding: 12px 4px;
+  border-top: 2px dashed var(--mid); border-bottom: 2px dashed var(--mid);
+  font-family: ui-monospace, Menlo, monospace; color: var(--dark);
+}
+.sub {
+  display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  font-size: calc(var(--fs) * .85); padding: 2px 0;
+}
+.sub .dot {
+  flex: none; width: .7em; height: .7em; border-radius: 50%;
+  background: hsl(var(--h, 140) 55% 55%);
+}
+.sub .sn { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.total {
+  display: flex; justify-content: space-between; font-weight: 700;
+  font-size: calc(var(--fs) + 2px); margin-top: 8px; padding-top: 8px;
+  border-top: 2px dashed var(--mid);
+}
+.total.alone { margin-top: 0; padding-top: 0; border-top: 0; }
+.fab {
+  position: fixed; right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  width: 64px; height: 64px; border-radius: 50%; border: 0;
+  background: var(--mid); color: #fff; font-size: 36px; line-height: 1;
+  box-shadow: 0 4px 12px rgba(0,0,0,.25); cursor: pointer;
+}
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none;
+  align-items: flex-end; justify-content: center; z-index: 10;
+}
+.overlay.open { display: flex; }
+.sheet {
+  width: 100%; max-width: 640px; background: var(--sheet); border-radius: 22px 22px 0 0;
+  padding: 20px 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+}
+.sheet h2 { margin: 0 0 14px; color: var(--dark); font-size: 20px; }
+.sheet label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+.sheet input[type=text] {
+  width: 100%; font-size: 17px; padding: 12px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text);
+}
+.sheet input[type=range] { width: 100%; accent-color: var(--mid); }
+.actions { display: flex; gap: 10px; margin-top: 18px; }
+.actions button {
+  flex: 1; padding: 13px; border-radius: 12px; border: 0; font-size: 17px; font-weight: 600; cursor: pointer;
+}
+.primary { background: var(--mid); color: #fff; }
+.secondary { background: var(--chip); color: var(--dark); }
+.danger { background: transparent; color: #c0392b; border: 1px solid #c0392b !important; }
+.preview { margin-top: 12px; font-size: var(--fs); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Einkaufsliste</h1>
+  <button class="icon-btn" id="settingsBtn" aria-label="Einstellungen">⚙︎</button>
+</header>
+<div class="sortbar" id="sortbar">
+  <span>Sortieren:</span>
+  <button data-sort="laden">Laden</button>
+  <button data-sort="preis">Preis</button>
+</div>
+<div class="hintwrap">
+  <div class="hint" id="hint" hidden>
+    <span>👆 Tipp: Eintrag kurz gedrückt halten (oder an den Punkten ziehen), um ihn zu verschieben</span>
+    <button id="hintX" aria-label="Hinweis schliessen">✕</button>
+  </div>
+</div>
+<main>
+  <div id="list"></div>
+  <div class="bon" id="bon"></div>
+</main>
+<button class="fab" id="addBtn" aria-label="Hinzufügen">+</button>
+
+<div class="overlay" id="editOverlay">
+  <div class="sheet">
+    <h2 id="editTitle">Neuer Eintrag</h2>
+    <label for="fLaden">Laden</label>
+    <input type="text" id="fLaden" list="stores" autocomplete="off">
+    <datalist id="stores"></datalist>
+    <label for="fName">Produkt</label>
+    <input type="text" id="fName" autocomplete="off">
+    <label for="fPreis">Preis</label>
+    <input type="text" id="fPreis" inputmode="decimal" autocomplete="off">
+    <div class="actions">
+      <button class="danger" id="delBtn">Löschen</button>
+      <button class="secondary" id="cancelBtn">Abbrechen</button>
+      <button class="primary" id="saveBtn">Sichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="setOverlay">
+  <div class="sheet">
+    <h2>Einstellungen</h2>
+    <label for="fSize">Schriftgrösse</label>
+    <input type="range" id="fSize" min="12" max="30" step="1">
+    <div class="preview" id="preview"></div>
+    <div class="actions"><button class="primary" id="setDone">Fertig</button></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var KEY = "einkaufsliste-v1";
+  var state = { items: [], size: 17, sort: "added", dir: "asc", colors: {}, hintDone: false };
+  var editingId = null;
+
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) { var p = JSON.parse(raw); if (p && Array.isArray(p.items)) state = Object.assign(state, p); }
+  } catch (e) {}
+  if (!state.colors) state.colors = {};
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  var lang = navigator.language || "de-DE";
+  var currency = /CH|LI/.test(lang) ? "CHF" : "EUR";
+  function money(v) {
+    try { return new Intl.NumberFormat(lang, { style: "currency", currency: currency }).format(v); }
+    catch (e) { return v.toFixed(2) + " " + currency; }
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function $(id) { return document.getElementById(id); }
+  function key(laden) { return (laden || "").trim().toLowerCase(); }
+
+  // Jeder Laden bekommt beim ersten Auftauchen eine eigene Farbe (goldener Winkel)
+  function hueFor(laden) {
+    var k = key(laden);
+    if (!k) return null;
+    if (!(k in state.colors)) { state.colors[k] = Object.keys(state.colors).length; save(); }
+    return Math.round((state.colors[k] * 137.508 + 95) % 360);
+  }
+  function hStyle(laden) {
+    var h = hueFor(laden);
+    return h === null ? "" : ' style="--h:' + h + '"';
+  }
+  function cmpText(a, b) { return (a || "").localeCompare(b || "", "de", { sensitivity: "base" }); }
+
+  function sorted() {
+    var f = state.dir === "desc" ? -1 : 1;
+    var list = state.items.map(function (a, i) { return { a: a, i: i }; });
+    if (state.sort === "preis") {
+      list.sort(function (x, y) { return (x.a.preis - y.a.preis) * f || x.i - y.i; });
+    } else if (state.sort === "laden") {
+      list.sort(function (x, y) {
+        var kx = key(x.a.laden), ky = key(y.a.laden);
+        if (!kx && ky) return 1;
+        if (kx && !ky) return -1;
+        return cmpText(x.a.laden, y.a.laden) * f || x.i - y.i;
+      });
+    }
+    return list.map(function (e) { return e.a; });
+  }
+
+  function sums() {
+    var map = {}, order = [];
+    state.items.forEach(function (a) {
+      var k = key(a.laden);
+      if (!(k in map)) { map[k] = { laden: a.laden.trim(), sum: 0 }; order.push(k); }
+      map[k].sum += a.preis;
+    });
+    order.sort(function (x, y) {
+      if (!x && y) return 1;
+      if (x && !y) return -1;
+      return cmpText(x, y);
+    });
+    return order.map(function (k) { return map[k]; });
+  }
+
+  function rowHtml(a) {
+    return '<div class="row' + (a.done ? " done" : "") + '"' + hStyle(a.laden) + ' data-id="' + a.id + '">' +
+      '<button class="check" data-check="' + a.id + '" aria-label="Abhaken">' + (a.done ? "✓" : "") + "</button>" +
+      (a.laden ? '<span class="chip">' + esc(a.laden) + "</span>" : "") +
+      '<span class="name">' + esc(a.name) + "</span>" +
+      '<span class="price">' + money(a.preis) + '</span><span class="grip" aria-hidden="true"></span></div>';
+  }
+
+  function render() {
+    document.documentElement.style.setProperty("--fs", state.size + "px");
+
+    // Sortierleiste
+    Array.prototype.forEach.call($("sortbar").querySelectorAll("button"), function (b) {
+      var s = b.getAttribute("data-sort");
+      var label = { added: "Reihenfolge", laden: "Laden", preis: "Preis" }[s];
+      var active = state.sort === s;
+      b.classList.toggle("active", active);
+      b.textContent = label + (active && s !== "added" ? (state.dir === "asc" ? " ↑" : " ↓") : "");
+    });
+
+    // Liste
+    var items = sorted(), html = "", last = null;
+    var subMap = {};
+    sums().forEach(function (s) { subMap[key(s.laden)] = s; });
+    items.forEach(function (a) {
+      if (state.sort === "laden") {
+        var k = key(a.laden);
+        if (k !== last) {
+          var s = subMap[k];
+          html += '<div class="group"' + hStyle(a.laden) + "><span>" + esc(k ? s.laden : "Ohne Laden") +
+            '</span><span class="gp">' + money(s.sum) + "</span></div>";
+          last = k;
+        }
+      }
+      html += rowHtml(a);
+    });
+    $("hint").hidden = state.hintDone || state.items.length < 2;
+    $("list").innerHTML = html || '<div class="empty">Noch nichts auf der Liste.<br>Tippe auf +</div>';
+
+    // Kassenbon mit Zwischenpreisen je Laden
+    var s = sums(), total = state.items.reduce(function (t, a) { return t + a.preis; }, 0);
+    var bon = "";
+    var showSubs = s.length > 1 || (s.length === 1 && key(s[0].laden));
+    if (showSubs) {
+      s.forEach(function (x) {
+        bon += '<div class="sub"' + hStyle(x.laden) + '><span class="dot"></span><span class="sn">' +
+          esc(x.laden || "Ohne Laden") + "</span><span>" + money(x.sum) + "</span></div>";
+      });
+    }
+    bon += '<div class="total' + (showSubs ? "" : " alone") + '"><span>SUMME</span><span>' + money(total) + "</span></div>";
+    $("bon").innerHTML = bon;
+
+    // Vorschläge für Läden
+    $("stores").innerHTML = s.filter(function (x) { return x.laden; })
+      .map(function (x) { return '<option value="' + esc(x.laden) + '">'; }).join("");
+  }
+
+  $("sortbar").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-sort]");
+    if (!b) return;
+    var s = b.getAttribute("data-sort");
+    if (state.sort === s) {
+      // 1. Tipp: aufsteigend, 2. Tipp: absteigend, 3. Tipp: Sortierung aus = eigene Reihenfolge
+      if (state.dir === "asc") state.dir = "desc";
+      else { state.sort = "added"; state.dir = "asc"; }
+    } else { state.sort = s; state.dir = "asc"; }
+    save(); render();
+  });
+
+  function openEdit(id) {
+    editingId = id;
+    var a = state.items.find(function (x) { return x.id === id; });
+    $("editTitle").textContent = a ? "Eintrag" : "Neuer Eintrag";
+    $("fLaden").value = a ? a.laden : "";
+    $("fName").value = a ? a.name : "";
+    $("fPreis").value = a && a.preis ? String(a.preis.toFixed(2)).replace(".", ",") : "";
+    $("delBtn").style.display = a ? "" : "none";
+    $("editOverlay").classList.add("open");
+    setTimeout(function () { $(a ? "fName" : "fLaden").focus(); }, 50);
+  }
+  function closeEdit() { $("editOverlay").classList.remove("open"); editingId = null; }
+
+  $("list").addEventListener("click", function (e) {
+    if (suppressClick) return;
+    var c = e.target.closest("[data-check]");
+    if (c) {
+      var id = c.getAttribute("data-check");
+      state.items.forEach(function (a) { if (a.id === id) a.done = !a.done; });
+      save(); render(); return;
+    }
+    var r = e.target.closest(".row");
+    if (r) openEdit(r.getAttribute("data-id"));
+  });
+
+  $("addBtn").addEventListener("click", function () { openEdit(null); });
+  $("cancelBtn").addEventListener("click", closeEdit);
+  $("saveBtn").addEventListener("click", function () {
+    var name = $("fName").value.trim();
+    if (!name) { $("fName").focus(); return; }
+    var preis = parseFloat($("fPreis").value.replace(",", ".")) || 0;
+    var laden = $("fLaden").value.trim();
+    var a = state.items.find(function (x) { return x.id === editingId; });
+    if (a) { a.name = name; a.laden = laden; a.preis = preis; }
+    else state.items.push({ id: String(Date.now()) + Math.random().toString(36).slice(2, 6), laden: laden, name: name, preis: preis, done: false });
+    save(); render(); closeEdit();
+  });
+  $("delBtn").addEventListener("click", function () {
+    state.items = state.items.filter(function (x) { return x.id !== editingId; });
+    save(); render(); closeEdit();
+  });
+  $("editOverlay").addEventListener("click", function (e) { if (e.target === this) closeEdit(); });
+
+  function updatePreview() { $("preview").textContent = "Brot – " + state.size + " pt"; }
+  $("settingsBtn").addEventListener("click", function () {
+    $("fSize").value = state.size; updatePreview(); $("setOverlay").classList.add("open");
+  });
+  $("fSize").addEventListener("input", function () {
+    state.size = parseInt(this.value, 10); save(); render(); updatePreview();
+  });
+  $("setDone").addEventListener("click", function () { $("setOverlay").classList.remove("open"); });
+  $("setOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+
+  // ---- Lange drücken & verschieben (in jeder Sortierung) ----
+  var LP = null, drag = null, suppressClick = false;
+
+  $("list").addEventListener("touchstart", function (e) {
+    if (drag || e.touches.length !== 1) return;
+    var row = e.target.closest(".row");
+    if (!row || e.target.closest("[data-check]")) return;
+    var t = e.touches[0];
+    var isGrip = !!e.target.closest(".grip");
+    var lp = { x: t.clientX, y: t.clientY, timer: null, row: row };
+    lp.timer = setTimeout(function () { startDrag(row, lp.y); }, isGrip ? 0 : 400);
+    if (!isGrip) row.classList.add("pressing");
+    LP = lp;
+  }, { passive: true });
+
+  $("list").addEventListener("contextmenu", function (e) {
+    if (drag || LP) e.preventDefault();
+  });
+
+  function cancelLP() {
+    if (!LP) return;
+    clearTimeout(LP.timer);
+    LP.row.classList.remove("pressing");
+    LP = null;
+  }
+
+  function startDrag(row, y) {
+    row.classList.remove("pressing");
+    LP = null;
+    if (!state.hintDone) { state.hintDone = true; save(); }
+    var rect = row.getBoundingClientRect();
+    drag = { row: row, grab: y - rect.top, y: y, tr: 0, raf: 0, start: rowIds() };
+    row.classList.add("dragging");
+    dragLoop();
+  }
+
+  function rowIds() {
+    return Array.prototype.map.call($("list").querySelectorAll(".row"), function (r) {
+      return r.getAttribute("data-id");
+    });
+  }
+
+  function dragUpdate() {
+    var r = drag.row, rect = r.getBoundingClientRect();
+    var layoutTop = rect.top - drag.tr;
+    var wantTop = drag.y - drag.grab;
+    drag.tr = wantTop - layoutTop;
+    r.style.transform = "translateY(" + drag.tr + "px)";
+    var center = wantTop + rect.height / 2;
+    var rows = Array.prototype.slice.call($("list").querySelectorAll(".row"));
+    var idx = rows.indexOf(r);
+    var prev = rows[idx - 1], next = rows[idx + 1];
+    if (prev) {
+      var pr = prev.getBoundingClientRect();
+      if (center < pr.top + pr.height / 2) { r.parentNode.insertBefore(r, prev); return dragUpdate(); }
+    }
+    if (next) {
+      var nr = next.getBoundingClientRect();
+      if (center > nr.top + nr.height / 2) { r.parentNode.insertBefore(r, next.nextSibling); return dragUpdate(); }
+    }
+  }
+
+  function dragLoop() {
+    if (!drag) return;
+    var y = drag.y, step = 0, edge = 90;
+    if (y < edge) step = -Math.ceil((edge - y) / 6);
+    else if (y > window.innerHeight - edge) step = Math.ceil((y - (window.innerHeight - edge)) / 6);
+    if (step) window.scrollBy(0, step);
+    dragUpdate();
+    drag.raf = requestAnimationFrame(dragLoop);
+  }
+
+  document.addEventListener("touchmove", function (e) {
+    var t = e.touches[0];
+    if (drag) { e.preventDefault(); drag.y = t.clientY; return; }
+    if (LP && (Math.abs(t.clientX - LP.x) > 10 || Math.abs(t.clientY - LP.y) > 10)) {
+      cancelLP();
+    }
+  }, { passive: false });
+
+  function endDrag(e) {
+    cancelLP();
+    if (!drag) return;
+    cancelAnimationFrame(drag.raf);
+    var ids = rowIds();
+    if (ids.join() !== drag.start.join()) {
+      var byId = {};
+      state.items.forEach(function (a) { byId[a.id] = a; });
+      var neu = ids.map(function (id) { return byId[id]; }).filter(Boolean);
+      if (neu.length === state.items.length) {
+        state.items = neu;
+        if (state.sort === "preis") { state.sort = "added"; state.dir = "asc"; }
+      }
+    }
+    drag = null;
+    suppressClick = true;
+    setTimeout(function () { suppressClick = false; }, 400);
+    if (e && e.cancelable) e.preventDefault();
+    save(); render();
+  }
+  document.addEventListener("touchend", endDrag);
+  document.addEventListener("touchcancel", endDrag);
+
+  $("hintX").addEventListener("click", function () { state.hintDone = true; save(); render(); });
+
+  // Kleines Wackeln der ersten Karte als Hinweis, solange der Tipp noch nicht erledigt ist
+  function wiggle() {
+    if (drag || LP || state.hintDone || state.items.length < 2) return;
+    var r = $("list").querySelector(".row");
+    if (!r) return;
+    r.classList.remove("wiggle"); void r.offsetWidth; r.classList.add("wiggle");
+    setTimeout(function () { r.classList.remove("wiggle"); }, 900);
+  }
+  setTimeout(wiggle, 1200);
+  setInterval(wiggle, 9000);
+
+  render();
+})();
+</script>
+</body>
+</html>
