@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="Einkaufsliste">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
@@ -538,6 +539,14 @@ main { max-width: 640px; margin: 0 auto; padding: 4px 16px 120px; }
 
   render();
 })();
+</script>
+<script>
+// Offline-Betrieb: nur auf echten Webadressen registrieren, Fehler still ignorieren
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener("load", function () {
+    try { navigator.serviceWorker.register("sw.js").catch(function () {}); } catch (e) {}
+  });
+}
 </script>
 </body>
 </html>
